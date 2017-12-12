@@ -4,12 +4,17 @@ using System.Threading.Tasks;
 using System.Web.Http;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Connector;
+using Microsoft.Bot.Builder.FormFlow;
 
 namespace _2FABotDemo
 {
     [BotAuthentication]
     public class MessagesController : ApiController
     {
+        internal static IDialog<UserProfile> MakeRootDialog()
+        {
+            return Chain.From(() => FormDialog.FromForm(UserProfile.BuildForm));
+        }
         /// <summary>
         /// POST: api/Messages
         /// Receive a message from a user and reply to it
@@ -18,7 +23,7 @@ namespace _2FABotDemo
         {
             if (activity.Type == ActivityTypes.Message)
             {
-                await Conversation.SendAsync(activity, () => new Dialogs.RootDialog());
+                await Conversation.SendAsync(activity, ()=> MakeRootDialog());
             }
             else
             {
