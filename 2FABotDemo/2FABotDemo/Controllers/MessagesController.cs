@@ -13,7 +13,27 @@ namespace _2FABotDemo
     {
         internal static IDialog<UserProfile> MakeRootDialog()
         {
-            return Chain.From(() => FormDialog.FromForm(UserProfile.BuildForm));
+            return Chain.From(() => FormDialog.FromForm(UserProfile.BuildForm))
+                .Do(async(context, userprofile) => {
+                    try
+                    {
+                        var completed = await userprofile;
+                        await context.PostAsync("Done!");
+                    }
+                    catch (FormCanceledException<UserProfile> e)
+                    {
+                        string reply;
+                        if (e.InnerException == null)
+                        {
+                            reply = $"You quit on {e.Last} -- maybe you can finish next time!";
+                        }
+                        else
+                        {
+                            reply = "Sorry, I've had a short circuit. Please try again.";
+                        }
+                        await context.PostAsync(reply);
+                    }
+                }) ;
         }
         /// <summary>
         /// POST: api/Messages
