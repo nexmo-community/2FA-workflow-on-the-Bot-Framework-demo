@@ -5,6 +5,8 @@ using System.Web.Http;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Connector;
 using Microsoft.Bot.Builder.FormFlow;
+using System;
+using Nexmo.Api;
 
 namespace _2FABotDemo
 {
@@ -18,7 +20,8 @@ namespace _2FABotDemo
                     try
                     {
                         var completed = await userprofile;
-                        await context.PostAsync("Done!");
+                        SendVerificationCode(completed.PhoneNumber);
+                        await context.PostAsync("All Done! I sent a verification code to the phone number you provided.");
                     }
                     catch (FormCanceledException<UserProfile> e)
                     {
@@ -35,6 +38,16 @@ namespace _2FABotDemo
                     }
                 }) ;
         }
+
+        private static void SendVerificationCode(string phoneNumber)
+        {
+            var sverificationtart = NumberVerify.Verify(new NumberVerify.VerifyRequest
+            {
+                number = phoneNumber,
+                brand = "NexmoQS"
+            });
+        }
+
         /// <summary>
         /// POST: api/Messages
         /// Receive a message from a user and reply to it
