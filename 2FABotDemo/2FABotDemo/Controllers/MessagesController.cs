@@ -7,21 +7,34 @@ using Microsoft.Bot.Connector;
 using Microsoft.Bot.Builder.FormFlow;
 using System;
 using Nexmo.Api;
+using _2FABotDemo.Helpers;
 
 namespace _2FABotDemo
 {
     [BotAuthentication]
     public class MessagesController : ApiController
     {
-        internal static IDialog<UserProfile> MakeRootDialog()
+        private static VerifyHelper verify;
+
+        public static VerifyHelper GetVerify()
         {
-            return Chain.From(() => FormDialog.FromForm(UserProfile.BuildForm))
-                .Do(async(context, userprofile) => {
+            return verify;
+        }
+
+        public static void SetVerify(VerifyHelper value)
+        {
+            verify = value;
+        }
+
+        internal static IDialog<UserProfile> MakeRootDialog() => Chain.From(() => FormDialog.FromForm(UserProfile.BuildForm))
+                .Do(async (context, userprofile) =>
+                {
+                    SetVerify(new VerifyHelper());
                     try
                     {
                         var completed = await userprofile;
-                        SendVerificationCode(completed.PhoneNumber);
-                        await context.PostAsync("All Done! I sent a verification code to the phone number you provided.");
+                        GetVerify().SendVerificationCode(completed.PhoneNumber);
+                        await context.PostAsync("All Done! I sent a verification code to the phone number you provided. Could you please tell me the code once you receive it?");
                     }
                     catch (FormCanceledException<UserProfile> e)
                     {
@@ -36,18 +49,8 @@ namespace _2FABotDemo
                         }
                         await context.PostAsync(reply);
                     }
-                }) ;
-        }
-
-        private static void SendVerificationCode(string phoneNumber)
-        {
-            var sverificationtart = NumberVerify.Verify(new NumberVerify.VerifyRequest
-            {
-                number = phoneNumber,
-                brand = "NexmoQS"
-            });
-        }
-
+                });
+       
         /// <summary>
         /// POST: api/Messages
         /// Receive a message from a user and reply to it
@@ -56,8 +59,23 @@ namespace _2FABotDemo
         {
             if (activity.Type == ActivityTypes.Message)
             {
-                await Conversation.SendAsync(activity, ()=> MakeRootDialog());
+                StateClient sc = activity.GetStateClient();
+                BotData userData = sc.BotState.GetPrivateConversationData(
+                    activity.ChannelId, activity.Conversation.Id, activity.From.Id);
+                var boolProfileComplete = userData.GetProperty<bool>("ProfileComplete");
+                if (!boolProfileComplete)
+                {
+                    await Conversation.SendAsync(activity, () => MakeRootDialog());
+                }
+                else
+                {
+                    ConnectorClient connector = new ConnectorClient(new Uri(activity.ServiceUrl));
+                    Activity replyMessage = activity.CreateReply(GetVerify().CheckVerificationCode(activity.Text));
+                    await connector.Conversations.ReplyToActivityAsync(replyMessage);
+                }
+       
             }
+            
             else
             {
                 HandleSystemMessage(activity);
@@ -94,5 +112,6 @@ namespace _2FABotDemo
 
             return null;
         }
+      
     }
 }
